@@ -11,7 +11,21 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r, include=FALSE}
 library(caret)
-library(dummies)
+#library(dummy)
+library(caret)
+library(nnet)
+library(RWeka)
+library(neural)
+library(dummy)
+library(neuralnet)
+library(dplyr)
+library(corrplot)
+library(dplyr)
+library(plyr)
+library(e1071)
+library(rpart)
+library("rpart.plot")
+library(knitr)
 ```
 
 Para empezar con el análisis de los siguientes algoritmos: 
@@ -21,6 +35,8 @@ Para empezar con el análisis de los siguientes algoritmos:
     * Naive Bayes
     * Regresión Lineal
     * Regresión Logística
+    * Redes Neuronales
+    * Support Vector Machine
   
 Debemos cargar el dataset llamado "train.csv", y para este dataset se tomarán las siguientes variables:
 
@@ -134,38 +150,65 @@ if ((min(g1$SalePrice) > min(g2$SalePrice)) && (min(g1$SalePrice) > min(g3$SaleP
 datos$grupo <- mapvalues(datos$grupo, c(1, 2, 3), a)
 ```
 
+
 Para el análisis y comparación de los algoritmos contra Regresión Logística, necesitamos que la variable respuesta (grupo) sea dicotómica, así que se procede a converter la variable categórica en dicotómica, y se parte el dataset en TRAIN y TEST para entrenamiento y cross validation.
 
 ```{r, message=FALSE, warning=FALSE}
 porcentaje <- 0.7
-datos <- cbind(datos, dummy(datos$grupo, verbose = T))
+datos <- cbind(datos, dummy(datos, verbose = T))
 colnames(datos)[8:10] <- a
 
 corte <- sample(nrow(datos), nrow(datos) * porcentaje)
 train <- datos[corte, ]
 test <- datos[-corte, ]
+
+train$grupo <- as.factor(train$grupo)
+test$grupo <- as.factor(test$grupo)
 ```
 
+## Red Neuronal
+
+### Con nnet (modelo 1)
+
+Se utilizó una red neuronal con 5 capas ocultas, una cantidad máxima de iteraciones de 500 y una decadencia de los pesos de 5E-4.
+```{r}
+modelo <- nnet(grupo~., data = train[, c(1:5, 7)], size=5, rang=0.000001, decay=5e-4, maxit=500) 
+prediccion2 <- as.data.frame(predict(modelo, newdata = test[, 1:5]))
+columnaMasAlta <- apply(prediccion2, 1, function(x) colnames(prediccion2)[which.max(x)])
+test$prediccion2 <- columnaMasAlta
+
+confusionMatrix(as.factor(test$prediccion2), as.factor(test$grupo))
+```
+
+Vemos que este tipo de red neuronal obtiene un resultado de accuracy 82%. Aunque este valor es bastante bueno, si observamos la sensitividad de las casas caras, vemos que es de 0.65 aproximadamente, lo que nos indica que este modelo le es dificil predecir casas que son caras. Y, la especificidad y sensitividad de los otros es mayor a 0.8, y aunque están bien, no es el mejor escenario.
+
+### Con WEKA (modelo 2)
+
+El modelo de redes neuronales con WEKA, se utiliza una capa oculta con 5 nodos en ella, se utilizaron 5000 iteraciones para obtener un bajo costo de la función.
+```{r}
+NB <- make_Weka_classifier("weka/classifiers/functions/MultilayerPerceptron")
+nnodos='5'
+
+modeloWeka <- NB(grupo~., data=train[, c(1:5, 7)], control=Weka_control(H=nnodos, N=5000, G=TRUE), options=NULL)
+test$prediccionWeka <- predict(modeloWeka, newdata = test[, 1:5])
+confusionMatrix(test$prediccionWeka, test$grupo)
+```
+
+Los resultados son muy similares al modelo anterior. De igual forma, le cuesta predecir las caras que son caras, pues la sensitividad de las casas caras no alcanzó ni si quiera el 0.60. Se obtuvo un accuracy de 0.81. 
+
+Podemos notar que, aunque los modelos de redes neuronales son buenos modelos, para este caso, es preferible utilizar otros modelos pues, aciertan más y son más precisos.
+
 ## Regresión Logística
-    
-### Training
+
 ```{r}
 num <- which(colnames(train) == "Bajo")
 modelo <- glm(Bajo~., data = train[, c(1:5, num)], family = binomial(), maxit = 100)
 
-modelo
-
-summary(modelo)
-```
-
-Vemos que todas las variables poseen un nivel de significancia alto, a excepción de X1stFlrSF, pero se dejará en el modelo pues tiene buena correlación con SalePrice.
-
-### Testing
-```{r}
 pred <- predict(modelo, newdata = test[, 1:5], type = "response")
 prediccion <- ifelse(pred >= 0.5, 1, 0)
 confusionMatrix(as.factor(test$Bajo), as.factor(prediccion))
 ```
+
 
 Como vemos el resultado anterior, vemor que el modelo generado es muy bastante bueno. Predice correctamente 22 de 37, y 393 de 9. Posee un accuracy del 94.53%, con una sensitividad del 96.32% y especificidad del 70.97%, así que se concluye que el modelo de regresión logística para predecir si una cada es barata o no, es bueno, pues acierta casi en la totalidad, sin poseer overfitting.
 
@@ -275,6 +318,6 @@ El resultado del árbol de regresión es bastante deficiente. Se optuvo un rendi
 En resumen, se realizó una tabla que muestra los accuracy de cada modelo. Y podemos ver que para este análisis, la regresión logística de desempeñó de mejor manera que los demás modelos, con un 94% de presición. Esto 
 
 ```{r}
-resultado <- data.frame("Regresion_Logistica" = 0.9453, "Naive_Bayes" = 0.9157, "Regresion_lineal" = 0.9248, "Arbol_de_clasificacion" = 0.9294, "Arbol_de_regresion" = 0.3599)
+resultado <- data.frame("Regresion_Logistica" = 0.9453, "Naive_Bayes" = 0.9157, "Regresion_lineal" = 0.9248, "Arbol_de_clasificacion" = 0.9294, "Arbol_de_regresion" = 0.3599, "Redes N. con nnet" = 0.82, "Redes N. con WEKA" = 0.81)
 kable(resultado, caption = "Accuracy por modelo")
 ```
