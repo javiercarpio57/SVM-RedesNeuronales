@@ -1,4 +1,4 @@
----
+  ---
 title: "Modelo de Support Vector Machin & Redes neuronales"
 author: "Javier Carpio & Paul Belches"
 date: "13/04/2020"
@@ -10,11 +10,17 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r, include=FALSE}
+#Sys.setenv(~/usr/lib/jvm/java-11-openjdk-amd64/jre)
+#install.packages("rJava")
+#install.packages("RWeka")
+```
+
+```{r, include=FALSE}
 library(caret)
 #library(dummy)
 library(caret)
 library(nnet)
-library(RWeka)
+#library(RWeka)
 library(neural)
 library(dummy)
 library(neuralnet)
@@ -198,6 +204,33 @@ Los resultados son muy similares al modelo anterior. De igual forma, le cuesta p
 
 Podemos notar que, aunque los modelos de redes neuronales son buenos modelos, para este caso, es preferible utilizar otros modelos pues, aciertan más y son más precisos.
 
+##SVM
+
+##Modelo lineal 
+
+```{r}
+modeloTuneado<-tune.svm(grupo~., data=train[, c(1:5, 7)], cost=c(0.01,0.1,0.5,1,5,10,16,20,32), kernel="linear")
+predMejorModelo<-predict(modeloTuneado$best.model,newdata = test[,1:5])
+confusionMatrix(test$grupo,predMejorModelo)
+```
+
+En el caso del svm con modelo lineal se obtiene un resultado de accuracy 82.69%. Es bastante bueno. Si observamos la sensitividad , vemos que es mayor al 70 porciento en todas las categorias , por lo que cuentan con un indice estable para cada una de las categorías de las casas. 
+
+En lo que respecta al tiempo de generación, le modelo se genero rápidamente. Tomando encuenta que la función tune utiliza realiza una mayor cantidad de iteraciones que si solo se hiciera un modelo , inica que el modelo se puede genrar de froma veloz. 
+
+##Modelo Radial
+
+```{r}
+modeloTuneado<-tune.svm(grupo~., data=train[, c(1:5, 7)], cost=c(0.01,0.1,0.5,1,5,10,16,20,32), kernel="radial")
+predMejorModelo<-predict(modeloTuneado$best.model,newdata = test[,1:5])
+confusionMatrix(test$grupo,predMejorModelo)
+```
+
+En el caso del svm con modelo lineal se obtiene un resultado de accuracy 84.05%. Es bastante bueno, mejor que el modelo anterior. Si observamos la sensitividad sin embargo, vemos que disminuyo en la categoria de caro, aunque mejoro de gran manera en la categoria de casas bajas. 
+
+En lo que respecta al tiempo de generación, le modelo se genero rápidamente. Tomando encuenta que la función tune utiliza realiza una mayor cantidad de iteraciones que si solo se hiciera un modelo , inica que el modelo se puede genrar de froma veloz. 
+
+
 ## Regresión Logística
 
 ```{r}
@@ -315,9 +348,11 @@ El resultado del árbol de regresión es bastante deficiente. Se optuvo un rendi
 
 # Resultado
 
-En resumen, se realizó una tabla que muestra los accuracy de cada modelo. Y podemos ver que para este análisis, la regresión logística de desempeñó de mejor manera que los demás modelos, con un 94% de presición. Esto 
+En resumen, se realizó una tabla que muestra los accuracy de cada modelo. Y podemos ver que para este análisis, la regresión logística de desempeñó de mejor manera que los demás modelos, con un 94% de presición. 
+
+En el caso de los modelos analizados en específico para este ejercicio, podemos observar que ambos se desempeñan de manera similar en lo que respecta a porcentajes de presición, alrededor del 80%. Sin embargo las redes neuronales toman más tiempo en generarse, lo que podría llegar a ser una desventaja. 
 
 ```{r}
-resultado <- data.frame("Regresion_Logistica" = 0.9453, "Naive_Bayes" = 0.9157, "Regresion_lineal" = 0.9248, "Arbol_de_clasificacion" = 0.9294, "Arbol_de_regresion" = 0.3599, "Redes N. con nnet" = 0.82, "Redes N. con WEKA" = 0.81)
+resultado <- data.frame("Regresion_Logistica" = 0.9453, "Naive_Bayes" = 0.9157, "Regresion_lineal" = 0.9248, "Arbol_de_clasificacion" = 0.9294, "Arbol_de_regresion" = 0.3599, "Redes N. con nnet" = 0.82, "Redes N. con WEKA" = 0.81, "SVM lineal" = 0.83, "SVM radial" = 0.84)
 kable(resultado, caption = "Accuracy por modelo")
 ```
